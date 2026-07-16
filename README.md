@@ -19,10 +19,23 @@ reviews and posts.
    policies. Add your on-cost rates to `process/on_cost_rates.md`.
 5. Recommended: initialise a git repo so each month's close is version-controlled.
 
+## Pulling data from Xero (optional)
+
+If your GL lives in Xero, you can fetch the month-end trial balance straight
+into the inputs folder instead of exporting it by hand. See
+[`integrations/xero/README.md`](integrations/xero/README.md) for setup — create
+a read-only Custom Connection, set `XERO_CLIENT_ID` / `XERO_CLIENT_SECRET` on
+the environment, then:
+
+    python integrations/xero/fetch_trial_balance.py 2026-07
+
+The integration is strictly read-only — it never posts anything back to Xero.
+
 ## Monthly run (e.g. July 2026)
 
 1. Create `inputs/2026-07/` and drop in the exports listed in `CLAUDE.md`
    (trial balance, revenue by partner, AP invoices, GRNI, leave balances, etc.).
+   (Or fetch the trial balance from Xero — see above.)
 2. Start Claude Code in this folder and run:
 
    /month-end-close 2026-07
