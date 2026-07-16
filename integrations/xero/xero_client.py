@@ -166,6 +166,47 @@ def get_report(
     return _get(url, access_token, tenant_id)
 
 
+def get_endpoint(
+    access_token: str,
+    tenant_id: str,
+    endpoint: str,
+    params: dict[str, str] | None = None,
+) -> dict[str, Any]:
+    """Fetch any read-only Accounting API endpoint (e.g. ``Invoices``)."""
+    url = f"{API_BASE}/{endpoint.lstrip('/')}"
+    if params:
+        url = f"{url}?{urllib.parse.urlencode(params)}"
+    return _get(url, access_token, tenant_id)
+
+
+def get_paged(
+    access_token: str,
+    tenant_id: str,
+    endpoint: str,
+    item_key: str,
+    params: dict[str, str] | None = None,
+    page_size: int = 100,
+    max_pages: int = 1000,
+) -> list[dict[str, Any]]:
+    """Fetch a paginated Accounting API collection and return all items.
+
+    Xero returns at most ``page_size`` (100) items per page; this walks pages
+    until a short/empty page is returned. Read-only (GET) throughout.
+    """
+    items: list[dict[str, Any]] = []
+    page = 1
+    while page <= max_pages:
+        page_params = dict(params or {})
+        page_params["page"] = str(page)
+        payload = get_endpoint(access_token, tenant_id, endpoint, page_params)
+        batch = payload.get(item_key) or []
+        items.extend(batch)
+        if len(batch) < page_size:
+            break
+        page += 1
+    return items
+
+
 def connect(
     tenant_name: str | None = None, scopes: str = DEFAULT_SCOPES
 ) -> tuple[str, str]:

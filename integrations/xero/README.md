@@ -1,8 +1,19 @@
 # Xero integration (read-only)
 
-Pulls source data for the month-end close directly from Xero instead of a
-manual GL export. Today it fetches the **Trial Balance** — the input every
-close task reconciles against — and writes it to `inputs/YYYY-MM/`.
+Pulls source data for the month-end close directly from Xero instead of manual
+exports, writing into `inputs/YYYY-MM/`:
+
+| Script | Pulls | Feeds |
+|--------|-------|-------|
+| `fetch_trial_balance.py` | Trial Balance as at month end | every task |
+| `fetch_ap_invoices.py` | AP invoices (bills) dated in the period | prepayments-recon, accruals-recon |
+| `fetch_report.py` | Any standard report (Bank Summary, P&L, Balance Sheet, Aged Payables) | other-revenue, final analytical review |
+
+**What Xero can't provide.** The accounting API has no goods-receipt/GRNI data
+and no raw bank-statement lines, so `open_pos_grni.csv` and `bank_statements.csv`
+still come from their source systems. `fetch_report.py BankSummary` gives cash
+movements per bank account as supporting data, but it is not a substitute for
+the bank statement export.
 
 > **Read-only by design.** These scripts only ever call Xero's *read* endpoints
 > and request only read scopes. There is no code path that creates, updates,
@@ -79,6 +90,43 @@ account_code, account_name, account_type, debit, credit, ytd_debit, ytd_credit
 
 `debit`/`credit` are the account balances as at the report date; `ytd_*` are the
 year-to-date figures Xero returns alongside them.
+
+## 5. Fetch AP invoices (bills)
+
+```bash
+# Writes inputs/2026-07/ap_invoices.csv for bills dated in July 2026
+python integrations/xero/fetch_ap_invoices.py 2026-07
+
+# Widen the window to catch late invoices relating to the period
+python integrations/xero/fetch_ap_invoices.py 2026-07 --to-date 2026-08-10
+```
+
+One row per invoice line (the granularity prepayments/accruals need). Only
+posted bills (AUTHORISED/PAID) by default; add `--include-drafts` for DRAFT and
+SUBMITTED. Same `--stdout` / `--force` / `--output` / `--tenant` options as
+above. Columns:
+
+```
+invoice_date, due_date, invoice_number, reference, supplier, status,
+line_description, account_code, account_name, line_amount, tax_amount,
+currency, invoice_total, invoice_id
+```
+
+## 6. Fetch a standard report
+
+```bash
+python integrations/xero/fetch_report.py BankSummary    --period 2026-07
+python integrations/xero/fetch_report.py ProfitAndLoss  --period 2026-07
+python integrations/xero/fetch_report.py BalanceSheet   --period 2026-07
+python integrations/xero/fetch_report.py AgedPayablesByContact \
+    --period 2026-07 --param contactID=<guid>
+```
+
+Dates are derived from `--period` (as-at date for Balance Sheet / Trial Balance
+/ Aged reports; from/to range for the rest) and can be overridden with
+`--date` / `--from-date` / `--to-date`. Pass any other report parameter with
+`--param key=value` (repeatable). Output defaults to
+`inputs/<period>/<report>.csv`.
 
 ## Extending
 
